@@ -150,13 +150,60 @@ function displayPhotoPreview() {
     
     const reader = new FileReader();
     reader.onload = function(e) {
-        photoPreview.innerHTML = `
-            <img src="${e.target.result}" alt="Preview" class="image-preview">
-            <div class="file-item">
-                <i class="fas fa-image"></i>
-                <span>${photoFile.name} (${formatFileSize(photoFile.size)})</span>
-            </div>
+        const img = document.createElement("img");
+        img.src = e.target.result;
+        img.alt = "Preview";
+        img.className = "image-preview";
+
+        // Call color extraction when image is actually loaded
+        img.onload = function() {
+            generateColorPalette(img);
+        };
+
+        photoPreview.innerHTML = '';
+        photoPreview.appendChild(img);
+
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-item';
+        fileItem.innerHTML = `
+            <i class="fas fa-image"></i>
+            <span>${photoFile.name} (${formatFileSize(photoFile.size)})</span>
         `;
+        photoPreview.appendChild(fileItem);
+    };
+    reader.readAsDataURL(photoFile);
+
+}
+function displayPhotoPreview() {
+    photoPreview.innerHTML = '';
+    
+    if (!photoFile) {
+        photoPreview.innerHTML = '<p style="color: #666; font-style: italic;">No photo selected</p>';
+        return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const img = document.createElement("img");
+        img.src = e.target.result;
+        img.alt = "Preview";
+        img.className = "image-preview";
+
+        // Call color extraction when image is actually loaded
+        img.onload = function() {
+            generateColorPalette(img);
+        };
+
+        photoPreview.innerHTML = '';
+        photoPreview.appendChild(img);
+
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-item';
+        fileItem.innerHTML = `
+            <i class="fas fa-image"></i>
+            <span>${photoFile.name} (${formatFileSize(photoFile.size)})</span>
+        `;
+        photoPreview.appendChild(fileItem);
     };
     reader.readAsDataURL(photoFile);
 }
@@ -193,45 +240,41 @@ function processFiles() {
 
 function displayResults() {
     resultsSection.style.display = 'block';
-    
-    // Generate color palette from photo
-    if (photoFile) {
-        generateColorPalette();
-    }
-    
-    // Display file list
     displayFileList();
-    
-    // Scroll to results
     resultsSection.scrollIntoView({ behavior: 'smooth' });
 }
 
-function generateColorPalette() {
+function generateColorPalette(imgElement) {
     colorPalette.innerHTML = '<h4>Color Palette</h4>';
-    
-    // Sample colors for demonstration
-    const sampleColors = [
-        { name: 'Primary Blue', value: '#667eea', hex: '#667eea' },
-        { name: 'Secondary Purple', value: '#764ba2', hex: '#764ba2' },
-        { name: 'Accent Gold', value: '#ffd700', hex: '#ffd700' },
-        { name: 'Success Green', value: '#28a745', hex: '#28a745' },
-        { name: 'Warning Orange', value: '#fd7e14', hex: '#fd7e14' },
-        { name: 'Danger Red', value: '#dc3545', hex: '#dc3545' }
-    ];
-    
-    sampleColors.forEach(color => {
-        const colorItem = document.createElement('div');
-        colorItem.className = 'color-item';
-        colorItem.innerHTML = `
-            <div class="color-swatch" style="background-color: ${color.hex}"></div>
-            <div class="color-info">
-                <div class="color-name">${color.name}</div>
-                <div class="color-value">${color.value}</div>
-            </div>
-        `;
-        colorPalette.appendChild(colorItem);
-    });
+
+    const colorThief = new ColorThief();
+
+    if (imgElement.complete && imgElement.naturalWidth > 0) {
+        const palette = colorThief.getPalette(imgElement, 6); 
+
+        palette.forEach((rgb, index) => {
+            const hex = rgbToHex(rgb[0], rgb[1], rgb[2]);
+            const colorItem = document.createElement('div');
+            colorItem.className = 'color-item';
+            colorItem.innerHTML = `
+                <div class="color-swatch" style="background-color: ${hex}"></div>
+                <div class="color-info">
+                    <div class="color-name">Color ${index + 1}</div>
+                    <div class="color-value">${hex}</div>
+                </div>
+            `;
+            colorPalette.appendChild(colorItem);
+        });
+    } else {
+        setTimeout(() => generateColorPalette(imgElement), 100);
+    }
 }
+
+function rgbToHex(r, g, b) {
+    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b)
+        .toString(16).slice(1).toUpperCase();
+}
+
 
 function displayFileList() {
     fileList.innerHTML = '<h4>Uploaded Files</h4>';
@@ -270,6 +313,7 @@ function displayFileList() {
         fileList.appendChild(photoItem);
     }
 }
+
 
 function clearAll() {
     // Reset all variables
