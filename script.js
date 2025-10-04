@@ -140,40 +140,7 @@ function displayFolderPreview() {
     }
 }
 
-function displayPhotoPreview() {
-    photoPreview.innerHTML = '';
-    
-    if (!photoFile) {
-        photoPreview.innerHTML = '<p style="color: #666; font-style: italic;">No photo selected</p>';
-        return;
-    }
-    
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const img = document.createElement("img");
-        img.src = e.target.result;
-        img.alt = "Preview";
-        img.className = "image-preview";
 
-        // Call color extraction when image is actually loaded
-        img.onload = function() {
-            generateColorPalette(img);
-        };
-
-        photoPreview.innerHTML = '';
-        photoPreview.appendChild(img);
-
-        const fileItem = document.createElement('div');
-        fileItem.className = 'file-item';
-        fileItem.innerHTML = `
-            <i class="fas fa-image"></i>
-            <span>${photoFile.name} (${formatFileSize(photoFile.size)})</span>
-        `;
-        photoPreview.appendChild(fileItem);
-    };
-    reader.readAsDataURL(photoFile);
-
-}
 function displayPhotoPreview() {
     photoPreview.innerHTML = '';
     
