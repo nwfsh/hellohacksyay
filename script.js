@@ -1,0 +1,354 @@
+// Global variables
+let folderFiles = [];
+let photoFile = null;
+
+// DOM elements
+const folderInput = document.getElementById('folderInput');
+const photoInput = document.getElementById('photoInput');
+const folderPreview = document.getElementById('folderPreview');
+const photoPreview = document.getElementById('photoPreview');
+const processBtn = document.getElementById('processBtn');
+const clearBtn = document.getElementById('clearBtn');
+const resultsSection = document.getElementById('resultsSection');
+const colorPalette = document.getElementById('colorPalette');
+const fileList = document.getElementById('fileList');
+
+// Initialize event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    setupEventListeners();
+});
+
+function setupEventListeners() {
+    // Folder input change
+    folderInput.addEventListener('change', handleFolderUpload);
+    
+    // Photo input change
+    photoInput.addEventListener('change', handlePhotoUpload);
+    
+    // Process button
+    processBtn.addEventListener('click', processFiles);
+    
+    // Clear button
+    clearBtn.addEventListener('click', clearAll);
+    
+    // Drag and drop for upload cards
+    setupDragAndDrop();
+}
+
+function setupDragAndDrop() {
+    const uploadCards = document.querySelectorAll('.upload-card');
+    
+    uploadCards.forEach(card => {
+        card.addEventListener('dragover', handleDragOver);
+        card.addEventListener('dragleave', handleDragLeave);
+        card.addEventListener('drop', handleDrop);
+    });
+}
+
+function handleDragOver(e) {
+    e.preventDefault();
+    e.currentTarget.classList.add('dragover');
+}
+
+function handleDragLeave(e) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('dragover');
+}
+
+function handleDrop(e) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('dragover');
+    
+    const files = Array.from(e.dataTransfer.files);
+    const card = e.currentTarget;
+    
+    if (card.classList.contains('folder-upload')) {
+        // For folder upload, we can't directly handle dropped folders
+        // So we'll just show a message
+        showNotification('Please use the "Choose Folder" button to select a folder', 'info');
+    } else if (card.classList.contains('photo-upload')) {
+        const imageFiles = files.filter(file => file.type.startsWith('image/'));
+        if (imageFiles.length > 0) {
+            photoFile = imageFiles[0];
+            displayPhotoPreview();
+            updateProcessButton();
+        } else {
+            showNotification('Please select a valid image file', 'error');
+        }
+    }
+}
+
+function handleFolderUpload(e) {
+    const files = Array.from(e.target.files);
+    folderFiles = files;
+    displayFolderPreview();
+    updateProcessButton();
+}
+
+function handlePhotoUpload(e) {
+    const file = e.target.files[0];
+    if (file && file.type.startsWith('image/')) {
+        photoFile = file;
+        displayPhotoPreview();
+        updateProcessButton();
+    } else {
+        showNotification('Please select a valid image file', 'error');
+    }
+}
+
+function displayFolderPreview() {
+    folderPreview.innerHTML = '';
+    
+    if (folderFiles.length === 0) {
+        folderPreview.innerHTML = '<p style="color: #666; font-style: italic;">No files selected</p>';
+        return;
+    }
+    
+    const fileCount = folderFiles.length;
+    const totalSize = folderFiles.reduce((sum, file) => sum + file.size, 0);
+    const sizeText = formatFileSize(totalSize);
+    
+    folderPreview.innerHTML = `
+        <div class="file-item">
+            <i class="fas fa-folder"></i>
+            <span><strong>${fileCount}</strong> files selected (${sizeText})</span>
+        </div>
+    `;
+    
+    // Show first few files
+    const maxDisplay = 5;
+    const filesToShow = folderFiles.slice(0, maxDisplay);
+    
+    filesToShow.forEach(file => {
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-item';
+        fileItem.innerHTML = `
+            <i class="fas fa-file"></i>
+            <span>${file.name} (${formatFileSize(file.size)})</span>
+        `;
+        folderPreview.appendChild(fileItem);
+    });
+    
+    if (folderFiles.length > maxDisplay) {
+        const moreItem = document.createElement('div');
+        moreItem.className = 'file-item';
+        moreItem.innerHTML = `
+            <i class="fas fa-ellipsis-h"></i>
+            <span>... and ${folderFiles.length - maxDisplay} more files</span>
+        `;
+        folderPreview.appendChild(moreItem);
+    }
+}
+
+function displayPhotoPreview() {
+    photoPreview.innerHTML = '';
+    
+    if (!photoFile) {
+        photoPreview.innerHTML = '<p style="color: #666; font-style: italic;">No photo selected</p>';
+        return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        photoPreview.innerHTML = `
+            <img src="${e.target.result}" alt="Preview" class="image-preview">
+            <div class="file-item">
+                <i class="fas fa-image"></i>
+                <span>${photoFile.name} (${formatFileSize(photoFile.size)})</span>
+            </div>
+        `;
+    };
+    reader.readAsDataURL(photoFile);
+}
+
+function updateProcessButton() {
+    const hasFiles = folderFiles.length > 0 || photoFile !== null;
+    processBtn.disabled = !hasFiles;
+    
+    if (hasFiles) {
+        processBtn.innerHTML = '<i class="fas fa-magic"></i> Process Files';
+    } else {
+        processBtn.innerHTML = '<i class="fas fa-magic"></i> Process Files';
+    }
+}
+
+function processFiles() {
+    if (folderFiles.length === 0 && !photoFile) {
+        showNotification('Please upload files before processing', 'error');
+        return;
+    }
+    
+    // Show loading state
+    processBtn.innerHTML = '<div class="loading"></div> Processing...';
+    processBtn.disabled = true;
+    
+    // Simulate processing time
+    setTimeout(() => {
+        displayResults();
+        processBtn.innerHTML = '<i class="fas fa-magic"></i> Process Files';
+        processBtn.disabled = false;
+        showNotification('Files processed successfully!', 'success');
+    }, 2000);
+}
+
+function displayResults() {
+    resultsSection.style.display = 'block';
+    
+    // Generate color palette from photo
+    if (photoFile) {
+        generateColorPalette();
+    }
+    
+    // Display file list
+    displayFileList();
+    
+    // Scroll to results
+    resultsSection.scrollIntoView({ behavior: 'smooth' });
+}
+
+function generateColorPalette() {
+    colorPalette.innerHTML = '<h4>Color Palette</h4>';
+    
+    // Sample colors for demonstration
+    const sampleColors = [
+        { name: 'Primary Blue', value: '#667eea', hex: '#667eea' },
+        { name: 'Secondary Purple', value: '#764ba2', hex: '#764ba2' },
+        { name: 'Accent Gold', value: '#ffd700', hex: '#ffd700' },
+        { name: 'Success Green', value: '#28a745', hex: '#28a745' },
+        { name: 'Warning Orange', value: '#fd7e14', hex: '#fd7e14' },
+        { name: 'Danger Red', value: '#dc3545', hex: '#dc3545' }
+    ];
+    
+    sampleColors.forEach(color => {
+        const colorItem = document.createElement('div');
+        colorItem.className = 'color-item';
+        colorItem.innerHTML = `
+            <div class="color-swatch" style="background-color: ${color.hex}"></div>
+            <div class="color-info">
+                <div class="color-name">${color.name}</div>
+                <div class="color-value">${color.value}</div>
+            </div>
+        `;
+        colorPalette.appendChild(colorItem);
+    });
+}
+
+function displayFileList() {
+    fileList.innerHTML = '<h4>Uploaded Files</h4>';
+    
+    // Add folder files
+    if (folderFiles.length > 0) {
+        const folderHeader = document.createElement('div');
+        folderHeader.className = 'file-list-item';
+        folderHeader.innerHTML = '<i class="fas fa-folder"></i> <strong>Folder Contents:</strong>';
+        fileList.appendChild(folderHeader);
+        
+        folderFiles.forEach(file => {
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-list-item';
+            fileItem.innerHTML = `
+                <i class="fas fa-file"></i>
+                <span>${file.name} (${formatFileSize(file.size)})</span>
+            `;
+            fileList.appendChild(fileItem);
+        });
+    }
+    
+    // Add photo file
+    if (photoFile) {
+        const photoHeader = document.createElement('div');
+        photoHeader.className = 'file-list-item';
+        photoHeader.innerHTML = '<i class="fas fa-image"></i> <strong>Photo:</strong>';
+        fileList.appendChild(photoHeader);
+        
+        const photoItem = document.createElement('div');
+        photoItem.className = 'file-list-item';
+        photoItem.innerHTML = `
+            <i class="fas fa-image"></i>
+            <span>${photoFile.name} (${formatFileSize(photoFile.size)})</span>
+        `;
+        fileList.appendChild(photoItem);
+    }
+}
+
+function clearAll() {
+    // Reset all variables
+    folderFiles = [];
+    photoFile = null;
+    
+    // Clear inputs
+    folderInput.value = '';
+    photoInput.value = '';
+    
+    // Clear previews
+    folderPreview.innerHTML = '<p style="color: #666; font-style: italic;">No files selected</p>';
+    photoPreview.innerHTML = '<p style="color: #666; font-style: italic;">No photo selected</p>';
+    
+    // Hide results
+    resultsSection.style.display = 'none';
+    
+    // Update process button
+    updateProcessButton();
+    
+    showNotification('All files cleared', 'info');
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function showNotification(message, type = 'info') {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : '#667eea'};
+        color: white;
+        padding: 15px 20px;
+        border-radius: 10px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        z-index: 1000;
+        font-weight: 500;
+        max-width: 300px;
+        animation: slideIn 0.3s ease-out;
+    `;
+    
+    notification.textContent = message;
+    
+    // Add to page
+    document.body.appendChild(notification);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease-in';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
+    }, 3000);
+}
+
+// Add CSS for notifications
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    
+    @keyframes slideOut {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
+    }
+`;
+document.head.appendChild(style);
