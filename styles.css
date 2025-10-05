@@ -19,7 +19,7 @@
     --text: #2c2f33;        /* body text on light surfaces */
   
     /* red accent */
-    --red: #e11d48;         /* primary red (rose-600 vibe) */
+    --red: #e11d48;  h       /* primary red (rose-600 vibe) */
     --red-600: #dc143c;     /* slightly deeper for hovers */
     --red-soft: #fde7ec;    /* subtle red-tinted bg */
     --red-shadow: rgba(225, 29, 72, 0.2);
