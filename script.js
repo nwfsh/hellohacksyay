@@ -1,6 +1,8 @@
 // Global variables
 let folderFiles = [];
 let photoFile = null;
+let imageStore = {}; // { imageId: { name, colors } }
+let imageCounter = 0; // to generate unique IDs
 
 // DOM elements
 const folderInput = document.getElementById('folderInput');
@@ -82,6 +84,36 @@ function handleFolderUpload(e) {
     const files = Array.from(e.target.files);
     folderFiles = files;
     displayFolderPreview();
+
+    files.forEach(file => {
+        if (file.type.startsWith("image/")) {
+            const imageId = `img_${++imageCounter}`;
+            const reader = new FileReader();
+
+            reader.onload = function(event) {
+                const img = new Image();
+                img.src = event.target.result;
+
+                img.onload = function() {
+                    const colorThief = new ColorThief();
+                    const palette = colorThief.getPalette(img, 8);
+                    const colors = palette.map(rgb => rgbToHex(rgb[0], rgb[1], rgb[2]));
+
+                    // store in object
+                    imageStore[imageId] = {
+                        name: file.name,
+                        colors: colors
+                    };
+
+                    console.log("Stored:", imageStore);
+                    displayStoredImages(); // CHANGES MADE
+                };
+            };
+
+            reader.readAsDataURL(file);
+        }
+    });
+
     updateProcessButton();
 }
 
@@ -90,6 +122,30 @@ function handlePhotoUpload(e) {
     if (file && file.type.startsWith('image/')) {
         photoFile = file;
         displayPhotoPreview();
+
+        const imageId = `img_${++imageCounter}`;
+        const reader = new FileReader();
+
+        reader.onload = function(event) {
+            const img = new Image();
+            img.src = event.target.result;
+
+            img.onload = function() {
+                const colorThief = new ColorThief();
+                const palette = colorThief.getPalette(img, 8);
+                const colors = palette.map(rgb => rgbToHex(rgb[0], rgb[1], rgb[2]));
+
+                imageStore[imageId] = {
+                    name: file.name,
+                    colors: colors
+                };
+
+                console.log("Stored:", imageStore);
+            };
+        };
+
+        reader.readAsDataURL(file);
+
         updateProcessButton();
     } else {
         showNotification('Please select a valid image file', 'error');
@@ -139,7 +195,6 @@ function displayFolderPreview() {
         folderPreview.appendChild(moreItem);
     }
 }
-
 
 function displayPhotoPreview() {
     photoPreview.innerHTML = '';
@@ -363,3 +418,33 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
+
+console.log("Stored:", imageStore);
+
+function displayStoredImages() {
+    resultsSection.innerHTML = "<h4>Stored Images & Colors</h4>";
+
+    for (const [id, data] of Object.entries(imageStore)) {
+        const item = document.createElement("div");
+        item.className = "image-result";
+        item.innerHTML = `
+            <p><strong>${data.name}</strong> (${id})</p>
+            <div class="palette"></div>
+        `;
+
+        // add swatches
+        const paletteDiv = item.querySelector(".palette");
+        data.colors.forEach(hex => {
+            const swatch = document.createElement("div");
+            swatch.className = "swatch";
+            swatch.style.backgroundColor = hex;
+            swatch.style.display = "inline-block";
+            swatch.style.width = "30px";
+            swatch.style.height = "30px";
+            swatch.style.marginRight = "5px";
+            paletteDiv.appendChild(swatch);
+        });
+
+        resultsSection.appendChild(item);
+    }
+}
