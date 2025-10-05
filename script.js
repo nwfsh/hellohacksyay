@@ -2,6 +2,7 @@
 let folderFiles = [];
 let photoFile = null;
 let imageStore = {}; // { imageId: { name, colors } }
+let mainImage = null; // NEW
 let imageCounter = 0; // to generate unique IDs
 
 // DOM elements
@@ -86,7 +87,7 @@ function handleFolderUpload(e) {
     displayFolderPreview();
 
     files.forEach(file => {
-        if (file.type.startsWith("image/")) {
+        if (file.type.startsWith("image/")) { // check if its even an image
             const imageId = `img_${++imageCounter}`;
             const reader = new FileReader();
 
@@ -98,15 +99,14 @@ function handleFolderUpload(e) {
                     const colorThief = new ColorThief();
                     const palette = colorThief.getPalette(img, 8);
                     const colors = palette.map(rgb => rgbToHex(rgb[0], rgb[1], rgb[2]));
-
                     // store in object
                     imageStore[imageId] = {
                         name: file.name,
-                        colors: colors
+                        colors: colors,
+                        src: event.target.result  // NEW CHANGES 
                     };
 
                     console.log("Stored:", imageStore);
-                    displayStoredImages(); // CHANGES MADE
                 };
             };
 
@@ -135,11 +135,12 @@ function handlePhotoUpload(e) {
                 const palette = colorThief.getPalette(img, 8);
                 const colors = palette.map(rgb => rgbToHex(rgb[0], rgb[1], rgb[2]));
 
-                imageStore[imageId] = {
+                mainImage = {
                     name: file.name,
-                    colors: colors
+                    colors: colors,
+                    src: event.target.result,
                 };
-
+                sortDisplayImages(mainImage); // NEWLY ADDED 
                 console.log("Stored:", imageStore);
             };
         };
@@ -246,14 +247,17 @@ function processFiles() {
         showNotification('Please upload files before processing', 'error');
         return;
     }
-    
+
     // Show loading state
     processBtn.innerHTML = '<div class="loading"></div> Processing...';
     processBtn.disabled = true;
-    
-    // Simulate processing time
+
     setTimeout(() => {
-        displayResults();
+        if (mainImage) {
+            sortDisplayImages(mainImage);   // ✅ show only matches
+        } else {
+            displayStoredImages();          // fallback: show all
+        }
         processBtn.innerHTML = '<i class="fas fa-magic"></i> Process Files';
         processBtn.disabled = false;
         showNotification('Files processed successfully!', 'success');
@@ -421,19 +425,27 @@ document.head.appendChild(style);
 
 console.log("Stored:", imageStore);
 
-function displayStoredImages() {
+function displayStoredImages(images = Object.entries(imageStore)) {
+    resultsSection.style.display = 'block';
     resultsSection.innerHTML = "<h4>Stored Images & Colors</h4>";
 
-    for (const [id, data] of Object.entries(imageStore)) {
+    for (const [id, data] of images) {
         const item = document.createElement("div");
         item.className = "image-result";
-        item.innerHTML = `
-            <p><strong>${data.name}</strong> (${id})</p>
-            <div class="palette"></div>
-        `;
 
-        // add swatches
-        const paletteDiv = item.querySelector(".palette");
+        const img = document.createElement("img");
+        img.src = data.src;
+        img.alt = data.name;
+        img.style.maxWidth = "150px";
+        img.style.display = "block";
+        img.style.marginBottom = "10px";
+
+        const title = document.createElement("p");
+        title.innerHTML = `<strong>${data.name}</strong> (${id})`;
+
+        const paletteDiv = document.createElement("div");
+        paletteDiv.className = "palette";
+
         data.colors.forEach(hex => {
             const swatch = document.createElement("div");
             swatch.className = "swatch";
@@ -445,6 +457,78 @@ function displayStoredImages() {
             paletteDiv.appendChild(swatch);
         });
 
+        item.appendChild(img);
+        item.appendChild(title);
+        item.appendChild(paletteDiv);
+
         resultsSection.appendChild(item);
     }
+}
+
+function colorDistance(c1, c2) {
+    const rDiff = c1[0] - c2[0];
+    const gDiff = c1[1] - c2[1];
+    const bDiff = c1[2] - c2[2];
+    return Math.sqrt(rDiff * rDiff + gDiff * gDiff + bDiff * bDiff);
+}
+
+// hex → [r,g,b]
+function hexToRgb(hex) {
+    const bigint = parseInt(hex.slice(1), 16);
+    return [
+        (bigint >> 16) & 255,
+        (bigint >> 8) & 255,
+        bigint & 255
+    ];
+}
+
+function paletteSimilarity(colorsA, colorsB) {
+    let total = 0;
+    let count = 0;
+
+    colorsA.forEach(hexA => {
+        const rgbA = hexToRgb(hexA);
+
+        let best = Infinity;
+        colorsB.forEach(hexB => {
+            const rgbB = hexToRgb(hexB);
+            const dist = colorDistance(rgbA, rgbB);
+            if (dist < best) best = dist;
+        });
+
+        total += best;
+        count++;
+    });
+
+    return total / count; // average distance
+}
+
+
+function sortDisplayImages(theMainImage) {
+    if (!theMainImage) {
+        showNotification("No main image selected", "error");
+        return [];
+    }
+
+    const results = [];
+    const threshold = 60; // loosen for debugging
+
+    for (const [id, data] of Object.entries(imageStore)) {
+        const score = paletteSimilarity(theMainImage.colors, data.colors);
+        console.log(`Image ${id} score:`, score); // DEBUG
+        if (score < threshold) {
+            results.push([id, { ...data, score }]);
+        }
+    }
+
+    results.sort((a, b) => a[1].score - b[1].score);
+
+    if (results.length === 0) {
+        resultsSection.style.display = 'block';
+        resultsSection.innerHTML = "<p>No matches found</p>";
+        return [];
+    }
+
+    displayStoredImages(results);
+    return results;
 }
